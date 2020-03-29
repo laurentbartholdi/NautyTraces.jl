@@ -3,6 +3,11 @@ uuid = "d13d708c-e6ca-4145-9b59-cdd1b3737971"
 authors = ["Laurent Bartholdi <laurent.bartholdi@gmail.com>"]
 version = "0.1.0"
 
+[deps]
+Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
+LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
+Permutations = "2ae35dd2-176d-5d53-8349-f30d82d94d4f"
+
 [compat]
 julia = "1"
 
