@@ -24,7 +24,7 @@ LightGraphs.is_directed(::DenseNautyDiGraph) = true
 DenseNautyXGraph = Union{DenseNautyGraph,DenseNautyDiGraph}
 
 num_setwords(n::Int) = (n+WORDSIZE-1)÷WORDSIZE
-setpos(n::Int) = 1 + (((n-1) & ~0x0003f) | (~(n-1) & 0x3f))
+setpos(n::Int) = 1+((n-1)⊻0x3f)
 
 DenseNautyGraph(n::Int) = (data = BitMatrix(undef,WORDSIZE*num_setwords(n),n); fill!(data,false); DenseNautyGraph(data))
 
@@ -71,15 +71,24 @@ end
 convert(::Type{DenseNautyGraph}, g) = DenseNautyGraph(g)
 convert(::Type{DenseNautyDiGraph}, g) = DenseNautyDiGraph(g)
 
-import Base.==
-==(g::DenseNautyXGraph, h::DenseNautyXGraph) = g.data == h.data
-
+Base.:(==)(g::DenseNautyXGraph, h::DenseNautyXGraph) = g.data == h.data
+Base.hash(g::DenseNautyXGraph) = hash(g.data)
+Base.copy(g::DenseNautyXGraph) = typeof(g)(copy(g.data))
+    
 Base.eltype(g::DenseNautyXGraph) = Int
 LightGraphs.edgetype(g::DenseNautyXGraph) = SimpleEdge{eltype(g)}
 
 LightGraphs.nv(g::DenseNautyXGraph) = size(g.data,2)
 
-LightGraphs.ne(g::DenseNautyGraph) = count(g.data) ÷ 2
+function LightGraphs.ne(g::DenseNautyGraph)
+    n = 0
+    for i=1:nv(g), j=1:i
+        if g.data[setpos(i),j] || g.data[setpos(j),i]
+            n += 1
+        end
+    end
+    n
+end
 LightGraphs.ne(g::DenseNautyDiGraph) = count(g.data)
 
 Base.zero(g::DenseNautyGraph) = DenseNautyGraph(BitMatrix(undef,0,0))
@@ -121,9 +130,21 @@ end
 
 LightGraphs.has_edge(g::DenseNautyXGraph, s::Int, d::Int) = g.data[setpos(d),s]
 
-LightGraphs.inneighbors(g::DenseNautyXGraph, v::Int) = g.data[setpos(v),:]
+function LightGraphs.inneighbors(g::DenseNautyXGraph, v::Int)
+    n = Int[]
+    for i=1:nv(g)
+        g.data[setpos(v),i] && push!(n,i)
+    end
+    n
+end
 
-LightGraphs.outneighbors(g::DenseNautyXGraph, v::Int) = g.data[:,v]
+function LightGraphs.outneighbors(g::DenseNautyXGraph, v::Int)
+    n = Int[]
+    for i=1:nv(g)
+        g.data[setpos(i),v] && push!(n,i)
+    end
+    n
+end
 
 LightGraphs.add_edge!(g::DenseNautyGraph, s::Int, d::Int) = (g.data[setpos(d),s] = g.data[setpos(s),d] = true)
 LightGraphs.add_edge!(g::DenseNautyDiGraph, s::Int, d::Int) = (g.data[setpos(d),s] = true)

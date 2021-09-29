@@ -56,13 +56,20 @@ mutable struct optionblk
 		# arbitrary extra options
 end
 
-CONSOLWIDTH = 78
+const CONSOLWIDTH = 78
+const DISPATCH_GRAPH = Ref{Ptr{Cvoid}}(0)
+const ADJACENCIES = Ref{Ptr{Cvoid}}(0)
+function __init__()
+    DISPATCH_GRAPH[] = cglobal((:dispatch_graph,LIB_FILE),Nothing)
+    ADJACENCIES[] = cglobal((:adjacencies,LIB_FILE),Nothing)
+    nothing
+end
 DEFAULTOPTIONS_GRAPH() = optionblk(0,false,false,false,true,false,CONSOLWIDTH,
                     C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,
-                    100,0,1,0,cglobal((:dispatch_graph,LIB_FILE),Nothing),false,C_NULL)
+                    100,0,1,0,DISPATCH_GRAPH[],false,C_NULL)
 DEFAULTOPTIONS_DIGRAPH() = optionblk(0,true,false,false,true,false,CONSOLWIDTH,
-                      C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,cglobal((:adjacencies,LIB_FILE),Nothing),
-                      100,0,999,0,cglobal((:dispatch_graph,LIB_FILE),Nothing),false,C_NULL)
+                    C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,ADJACENCIES[],
+                    100,0,999,0,DISPATCH_GRAPH[],false,C_NULL)
 DEFAULTOPTIONS(::Type{DenseNautyGraph}) = DEFAULTOPTIONS_GRAPH()
 DEFAULTOPTIONS(::Type{DenseNautyDiGraph}) = DEFAULTOPTIONS_DIGRAPH()
 DEFAULTOPTIONS(::DenseNautyGraph) = DEFAULTOPTIONS_GRAPH()
@@ -108,12 +115,12 @@ The return value is (stats, orbits, ...) a stats block, a description of the min
 """
 function densenauty(g::DenseNautyGraph,
                options = DEFAULTOPTIONS_GRAPH()::optionblk,
-                    partition = nothing::Union{Nothing,Tuple{Array{Cint},Array{Cint}}})
+                    partition = nothing::Union{Nothing,Tuple{Vector{Cint},Vector{Cint}}})
     __densenauty(g, options, partition)
 end
 function densenauty(g::DenseNautyDiGraph,
                     options = DEFAULTOPTIONS_DIGRAPH()::optionblk,
-                    partition = nothing::Union{Nothing,Tuple{Array{Cint},Array{Cint}}})
+                    partition = nothing::Union{Nothing,Tuple{Vector{Cint},Vector{Cint}}})
     __densenauty(g, options, partition)
 end
 
@@ -136,6 +143,7 @@ function __densenauty(g::DenseNautyXGraph, options::optionblk, partition)
     else
         outgraph = nothing
     end
+
     orbits = zeros(Cint, n)
 
     ccall((:densenauty, LIB_FILE), Cvoid,
@@ -152,15 +160,16 @@ function __densenauty(g::DenseNautyXGraph, options::optionblk, partition)
 end
 
 # ⚠ not thread-safe!
+# it doesn't seem possible to put this function inside the nauty function,
+# because the @cfunction call can't see it.
 const __gens = Permutation[]
-function userautomproc_jl(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint}, numorbits::Cint, stabvertex::Cint, n::Cint)
+function userautomproc_jl_global(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint}, numorbits::Cint, stabvertex::Cint, n::Cint)
     perm = unsafe_wrap(Array, permptr, n)
     orbits = unsafe_wrap(Array, orbitsptr, n)
 
     push!(__gens, Permutation(perm.+1))
     nothing
 end
-
 """nauty is a higher-level interface to nauty, which relies on densenauty.
 
 The arguments are a graph g and optional named arguments getcanon::Bool, automgroup::Bool and partition, which is either "nothing" or a list of lists of vertices (numbered from 1).
@@ -179,7 +188,7 @@ if getcanon,
 function nauty(g::DenseNautyXGraph;
                getcanon = false::Bool,
                automgroup = false::Bool,
-               partition = nothing::Union{Nothing,Vector{Vector{Int}}})
+               partition = nothing::Union{Nothing,Tuple{Vector{Cint},Vector{Cint}},Vector{Vector{Int}}})
     options = DEFAULTOPTIONS(g)
 
     if getcanon
@@ -188,6 +197,9 @@ function nauty(g::DenseNautyXGraph;
 
     if partition == nothing
         labptn = nothing
+    elseif isa(partition,Tuple)
+        options.defaultptn = false
+        labptn = partition
     else
         options.defaultptn = false
         n = nv(g)
@@ -198,19 +210,30 @@ function nauty(g::DenseNautyXGraph;
             @assert !isempty(p)
             lab[i+1:i+length(p)] = p.-1
             i += length(p)
-            ptn[i-1] = 0
+            ptn[i] = 0
         end
         labptn = (lab,ptn)
     end
-        
-    if automgroup
-        userautomproc_c = @cfunction(userautomproc_jl, Nothing, (Cint, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint))
 
-        options.userautomproc = userautomproc_c
-        isempty(__gens) || error("__gens is not empty, something is deeply wrong")
+    local generators
+    function userautomproc_jl(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint}, numorbits::Cint, stabvertex::Cint, n::Cint)
+        perm = unsafe_wrap(Array, permptr, n)
+        orbits = unsafe_wrap(Array, orbitsptr, n)
+
+        push!(generators, Permutation(perm.+1))
+        nothing
+    end
+    
+    if automgroup
+        generators = Permutation[]
+        userautomproc_c = @cfunction($userautomproc_jl, Nothing, (Cint, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint))
+        options.userautomproc = unsafe_convert(Ptr{Cvoid},userautomproc_c)
+        GC.@preserve userautomproc_c rv = densenauty(g, options, labptn)
+
+    else
+        rv = densenauty(g, options, labptn)
     end
 
-    rv = densenauty(g, options, labptn)
 
     stats = rv[1]
     stats.errstatus == 0 || error("densenauty: error $(stats.errstatus)")
@@ -221,11 +244,10 @@ function nauty(g::DenseNautyXGraph;
     push!(result, :numorbits => Int(stats.numorbits))
     push!(result, :numgenerators => Int(stats.numgenerators))
     if automgroup
-        push!(result, :generators => copy(__gens))
-        empty!(__gens)
+        push!(result, :generators => generators)
     end
     if getcanon
-        push!(result, :lab => Permutation(rv[3].+1))
+        push!(result, :lab => rv[3].+1)
         push!(result, :canong => rv[4])
     end
     result
