@@ -40,6 +40,8 @@ function DenseNautyGraph(mat::Union{Matrix,BitMatrix})
     DenseNautyGraph(data)
 end
 
+DenseNautyDiGraph(n::Int) = (data = BitMatrix(undef,WORDSIZE*num_setwords(n),n); fill!(data,false); DenseNautyDiGraph(data))
+
 function DenseNautyDiGraph(mat::Union{Matrix{Int},Matrix{Bool},BitMatrix})
     n = size(mat,1)
     n == size(mat,2) || error("mat should be a square matrix")
@@ -109,6 +111,7 @@ LightGraphs.edges(g::DenseNautyXGraph) = DenseNautyEdgeIter(g)
 struct DenseNautyEdgeIter <: AbstractEdgeIter
     g::DenseNautyXGraph
 end
+Base.length(eit::DenseNautyEdgeIter) = ne(eit.g)
 function Base.iterate(eit::DenseNautyEdgeIter, state=(1,0))
     g = eit.g
     n = nv(g)
