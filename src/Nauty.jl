@@ -1,9 +1,9 @@
 module Nauty
 
-using LightGraphs
+using Graphs
 using Permutations
 
-import LightGraphs
+import Graphs
 
 export nauty, NautyIsomorphism
 
@@ -253,15 +253,15 @@ function nauty(g::DenseNautyXGraph;
     result
 end
 
-"""NautyIsomorphism() may be supplied as "alg" argument to LightGraphs.Experimental.has_isomorphism
+"""NautyIsomorphism() may be supplied as "alg" argument to Graphs.Experimental.has_isomorphism
 """
-struct NautyIsomorphism <: LightGraphs.Experimental.IsomorphismAlgorithm
+struct NautyIsomorphism <: Graphs.Experimental.IsomorphismAlgorithm
 end
 
-function LightGraphs.Experimental.has_isomorph(g1::AbstractGraph, g2::AbstractGraph, ::NautyIsomorphism;
+function Graphs.Experimental.has_isomorph(g1::AbstractGraph, g2::AbstractGraph, ::NautyIsomorphism;
                          vertex_relation::Union{Nothing, Function}=nothing,
                          edge_relation::Union{Nothing, Function}=nothing)::Bool
-    !LightGraphs.Experimental.could_have_isomorph(g1, g2) && return false
+    Graphs.Experimental.could_have_isomorph(g1, g2) && return false
 
     vertex_relation == nothing || error("didn't code vertex relations yet")
     edge_relation == nothing || error("didn't code edge relations yet")

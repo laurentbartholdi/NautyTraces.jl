@@ -12,14 +12,14 @@ Each column of that matrix is thus a chunk of memory of size m, and the ith colu
 struct DenseNautyGraph <: AbstractGraph{Int}
     data::BitMatrix
 end
-LightGraphs.is_directed(::Type{DenseNautyGraph}) = false
-LightGraphs.is_directed(::DenseNautyGraph) = false
+Graphs.is_directed(::Type{DenseNautyGraph}) = false
+Graphs.is_directed(::DenseNautyGraph) = false
 
 struct DenseNautyDiGraph <: AbstractGraph{Int}
     data::BitMatrix
 end
-LightGraphs.is_directed(::Type{DenseNautyDiGraph}) = true
-LightGraphs.is_directed(::DenseNautyDiGraph) = true
+Graphs.is_directed(::Type{DenseNautyDiGraph}) = true
+Graphs.is_directed(::DenseNautyDiGraph) = true
 
 DenseNautyXGraph = Union{DenseNautyGraph,DenseNautyDiGraph}
 
@@ -78,11 +78,11 @@ Base.hash(g::DenseNautyXGraph) = hash(g.data)
 Base.copy(g::DenseNautyXGraph) = typeof(g)(copy(g.data))
     
 Base.eltype(g::DenseNautyXGraph) = Int
-LightGraphs.edgetype(g::DenseNautyXGraph) = SimpleEdge{eltype(g)}
+Graphs.edgetype(g::DenseNautyXGraph) = SimpleEdge{eltype(g)}
 
-LightGraphs.nv(g::DenseNautyXGraph) = size(g.data,2)
+Graphs.nv(g::DenseNautyXGraph) = size(g.data,2)
 
-function LightGraphs.ne(g::DenseNautyGraph)
+function Graphs.ne(g::DenseNautyGraph)
     n = 0
     for i=1:nv(g), j=1:i
         if g.data[setpos(i),j] || g.data[setpos(j),i]
@@ -91,7 +91,7 @@ function LightGraphs.ne(g::DenseNautyGraph)
     end
     n
 end
-LightGraphs.ne(g::DenseNautyDiGraph) = count(g.data)
+Graphs.ne(g::DenseNautyDiGraph) = count(g.data)
 
 Base.zero(g::DenseNautyGraph) = DenseNautyGraph(BitMatrix(undef,0,0))
 Base.zero(g::DenseNautyDiGraph) = DenseNautyDiGraph(BitMatrix(undef,0,0))
@@ -107,7 +107,7 @@ function Base.reverse(g::DenseNautyDiGraph)
     DenseNautyDiGraph(data)
 end
 
-LightGraphs.edges(g::DenseNautyXGraph) = DenseNautyEdgeIter(g)
+Graphs.edges(g::DenseNautyXGraph) = DenseNautyEdgeIter(g)
 struct DenseNautyEdgeIter <: AbstractEdgeIter
     g::DenseNautyXGraph
 end
@@ -131,9 +131,9 @@ function Base.iterate(eit::DenseNautyEdgeIter, state=(1,0))
     end
 end
 
-LightGraphs.has_edge(g::DenseNautyXGraph, s::Int, d::Int) = g.data[setpos(d),s]
+Graphs.has_edge(g::DenseNautyXGraph, s::Int, d::Int) = g.data[setpos(d),s]
 
-function LightGraphs.inneighbors(g::DenseNautyXGraph, v::Int)
+function Graphs.inneighbors(g::DenseNautyXGraph, v::Int)
     n = Int[]
     for i=1:nv(g)
         g.data[setpos(v),i] && push!(n,i)
@@ -141,7 +141,7 @@ function LightGraphs.inneighbors(g::DenseNautyXGraph, v::Int)
     n
 end
 
-function LightGraphs.outneighbors(g::DenseNautyXGraph, v::Int)
+function Graphs.outneighbors(g::DenseNautyXGraph, v::Int)
     n = Int[]
     for i=1:nv(g)
         g.data[setpos(i),v] && push!(n,i)
@@ -149,10 +149,10 @@ function LightGraphs.outneighbors(g::DenseNautyXGraph, v::Int)
     n
 end
 
-LightGraphs.add_edge!(g::DenseNautyGraph, s::Int, d::Int) = (g.data[setpos(d),s] = g.data[setpos(s),d] = true)
-LightGraphs.add_edge!(g::DenseNautyDiGraph, s::Int, d::Int) = (g.data[setpos(d),s] = true)
-LightGraphs.add_edge!(g::DenseNautyXGraph, e::Edge) = add_edge!(g, e.src, e.dst)
+Graphs.add_edge!(g::DenseNautyGraph, s::Int, d::Int) = (g.data[setpos(d),s] = g.data[setpos(s),d] = true)
+Graphs.add_edge!(g::DenseNautyDiGraph, s::Int, d::Int) = (g.data[setpos(d),s] = true)
+Graphs.add_edge!(g::DenseNautyXGraph, e::Edge) = add_edge!(g, e.src, e.dst)
 
-LightGraphs.rem_edge!(g::DenseNautyGraph, s::Int, d::Int) = (g.data[setpos(d),s] = g.data[setpos(s),d] = false; true)
-LightGraphs.rem_edge!(g::DenseNautyDiGraph, s::Int, d::Int) = (g.data[setpos(d),s] = false; true)
-LightGraphs.rem_edge!(g::DenseNautyXGraph, e::Edge) = rem_edge!(g, e.src, e.dst)
+Graphs.rem_edge!(g::DenseNautyGraph, s::Int, d::Int) = (g.data[setpos(d),s] = g.data[setpos(s),d] = false; true)
+Graphs.rem_edge!(g::DenseNautyDiGraph, s::Int, d::Int) = (g.data[setpos(d),s] = false; true)
+Graphs.rem_edge!(g::DenseNautyXGraph, e::Edge) = rem_edge!(g, e.src, e.dst)
