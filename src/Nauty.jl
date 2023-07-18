@@ -162,7 +162,7 @@ end
 # ⚠ not thread-safe!
 # it doesn't seem possible to put this function inside the nauty function,
 # because the @cfunction call can't see it.
-const __gens = Permutation[]
+global __gens = Permutation[]
 function userautomproc_jl_global(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint}, numorbits::Cint, stabvertex::Cint, n::Cint)
     perm = unsafe_wrap(Array, permptr, n)
     orbits = unsafe_wrap(Array, orbitsptr, n)
@@ -170,6 +170,7 @@ function userautomproc_jl_global(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr
     push!(__gens, Permutation(perm.+1))
     nothing
 end
+
 """nauty is a higher-level interface to nauty, which relies on densenauty.
 
 The arguments are a graph g and optional named arguments getcanon::Bool, automgroup::Bool and partition, which is either "nothing" or a list of lists of vertices (numbered from 1).
@@ -225,11 +226,14 @@ function nauty(g::DenseNautyXGraph;
     end
     
     if automgroup
-        generators = Permutation[]
-        userautomproc_c = @cfunction($userautomproc_jl, Nothing, (Cint, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint))
-        options.userautomproc = unsafe_convert(Ptr{Cvoid},userautomproc_c)
-        GC.@preserve userautomproc_c rv = densenauty(g, options, labptn)
-
+#        generators = Permutation[]
+#        userautomproc_c = @cfunction($userautomproc_jl, Nothing, (Cint, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint))
+#        options.userautomproc = unsafe_convert(Ptr{Cvoid},userautomproc_c)
+#        GC.@preserve userautomproc_c rv = densenauty(g, options, labptn)
+        global __gens
+        empty!(__gens)
+        options.userautomproc = @cfunction(userautomproc_jl_global, Nothing, (Cint, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint))
+        rv = densenauty(g, options, labptn)
     else
         rv = densenauty(g, options, labptn)
     end
@@ -244,7 +248,10 @@ function nauty(g::DenseNautyXGraph;
     push!(result, :numorbits => Int(stats.numorbits))
     push!(result, :numgenerators => Int(stats.numgenerators))
     if automgroup
-        push!(result, :generators => generators)
+        global __gens
+        #push!(result, :generators => generators)
+        push!(result, :generators => copy(__gens))
+        __gens = Permutation[]
     end
     if getcanon
         push!(result, :lab => rv[3].+1)
