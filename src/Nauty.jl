@@ -2,12 +2,11 @@ module Nauty
 
 using Graphs
 using Permutations
+using Libdl
 
-import Graphs
+export nauty, traces, NautyIsomorphism
 
-export nauty, NautyIsomorphism
-
-const LIB_FILE = "$(@__DIR__)" * "/../deps/nauty"
+const LIB_FILE = "$(@__DIR__)" * "/../deps/nauty." * Libdl.dlext
 
 const WORDSIZE = ccall((:wordsize, LIB_FILE), Int, ())
 
@@ -54,6 +53,7 @@ mutable struct optionblk
     schreier::Nbool	# use random schreier method
     extra_options::Ptr{Cvoid}	# void *extra_options;
 		# arbitrary extra options
+    automproc_data::Ptr{Cvoid}
 end
 
 const CONSOLWIDTH = 78
@@ -66,10 +66,10 @@ function __init__()
 end
 DEFAULTOPTIONS_GRAPH() = optionblk(0,false,false,false,true,false,CONSOLWIDTH,
                     C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,
-                    100,0,1,0,DISPATCH_GRAPH[],false,C_NULL)
+                    100,0,1,0,DISPATCH_GRAPH[],false,C_NULL,C_NULL)
 DEFAULTOPTIONS_DIGRAPH() = optionblk(0,true,false,false,true,false,CONSOLWIDTH,
                     C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,ADJACENCIES[],
-                    100,0,999,0,DISPATCH_GRAPH[],false,C_NULL)
+                    100,0,999,0,DISPATCH_GRAPH[],false,C_NULL,C_NULL)
 DEFAULTOPTIONS(::Type{DenseNautyGraph}) = DEFAULTOPTIONS_GRAPH()
 DEFAULTOPTIONS(::Type{DenseNautyDiGraph}) = DEFAULTOPTIONS_DIGRAPH()
 DEFAULTOPTIONS(::DenseNautyGraph) = DEFAULTOPTIONS_GRAPH()
@@ -159,15 +159,16 @@ function __densenauty(g::DenseNautyXGraph, options::optionblk, partition)
     (stats, orbits, result...)
 end
 
-# ⚠ not thread-safe!
-# it doesn't seem possible to put this function inside the nauty function,
-# because the @cfunction call can't see it.
-global __gens = Permutation[]
-function userautomproc_jl_global(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint}, numorbits::Cint, stabvertex::Cint, n::Cint)
+function userautomproc_jl_global(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint}, numorbits::Cint, stabvertex::Cint, n::Cint, data::Ptr{Vector{Permutation}}) #:Ref{Vector{Permutation}})
+    @info data
+#    xxx = unsafe_pointer_to_objref(extra_options)
+#    @info xxx
+    generators = Permutation[]
+#    @info generators
     perm = unsafe_wrap(Array, permptr, n)
     orbits = unsafe_wrap(Array, orbitsptr, n)
 
-    push!(__gens, Permutation(perm.+1))
+    push!(generators, Permutation(perm.+1))
     nothing
 end
 
@@ -216,24 +217,25 @@ function nauty(g::DenseNautyXGraph;
         labptn = (lab,ptn)
     end
 
-    local generators
-    function userautomproc_jl(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint}, numorbits::Cint, stabvertex::Cint, n::Cint)
+"""    local generators
+    function userautomproc_jl(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint}, numorbits::Cint, stabvertex::Cint, n::Cint, x::Ptr{Cvoid})
+        return nothing
         perm = unsafe_wrap(Array, permptr, n)
         orbits = unsafe_wrap(Array, orbitsptr, n)
 
         push!(generators, Permutation(perm.+1))
         nothing
     end
+   """
     
     if automgroup
-#        generators = Permutation[]
-#        userautomproc_c = @cfunction($userautomproc_jl, Nothing, (Cint, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint))
-#        options.userautomproc = unsafe_convert(Ptr{Cvoid},userautomproc_c)
-#        GC.@preserve userautomproc_c rv = densenauty(g, options, labptn)
-        global __gens
-        empty!(__gens)
-        options.userautomproc = @cfunction(userautomproc_jl_global, Nothing, (Cint, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint))
-        rv = densenauty(g, options, labptn)
+        options.userautomproc = @cfunction(userautomproc_jl_global, Nothing, (Cint, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Ptr{Vector{Permutation}})) #Ref{Vector{Permutation}}))
+        generators = Permutation[]
+        @info generators
+        @info pointer(generators)
+        @info pointer_from_objref(generators)
+        options.automproc_data = pointer_from_objref(generators)
+        rv = densenauty(g, options, labptn)        
     else
         rv = densenauty(g, options, labptn)
     end
@@ -243,19 +245,16 @@ function nauty(g::DenseNautyXGraph;
     stats.errstatus == 0 || error("densenauty: error $(stats.errstatus)")
     
     result = Dict()
-    push!(result, :orbits => rv[2].+1)
-    push!(result, :grpsize => div(BigInt(ldexp(significand(stats.grpsize1),precision(Float64)))*BigInt(10)^stats.grpsize2*BigInt(2)^exponent(stats.grpsize1)+BigInt(2)^(precision(Float64)-1),BigInt(2)^precision(Float64)))
-    push!(result, :numorbits => Int(stats.numorbits))
-    push!(result, :numgenerators => Int(stats.numgenerators))
+    result[:orbits] = rv[2].+1
+    result[:grpsize] = div(BigInt(ldexp(significand(stats.grpsize1),precision(Float64)))*BigInt(10)^stats.grpsize2*BigInt(2)^exponent(stats.grpsize1)+BigInt(2)^(precision(Float64)-1),BigInt(2)^precision(Float64))
+    result[:numorbits] = Int(stats.numorbits)
+    result[:numgenerators] = Int(stats.numgenerators)
     if automgroup
-        global __gens
-        #push!(result, :generators => generators)
-        push!(result, :generators => copy(__gens))
-        __gens = Permutation[]
+        result[:generators] = generators
     end
     if getcanon
-        push!(result, :lab => rv[3].+1)
-        push!(result, :canong => rv[4])
+        result[:lab] = rv[3].+1
+        result[:canong] = rv[4]
     end
     result
 end
