@@ -1,6 +1,6 @@
 using Libdl
 
-nautyver = "nauty27rc4"
+nautyver = "nauty2_8_6"
 nautydir = "$(@__DIR__)/$nautyver/"
 
 run(`tar xfz $(@__DIR__)/$nautyver.tar.gz -C $(@__DIR__)`)
