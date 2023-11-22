@@ -21,7 +21,7 @@ used, it is necessary to check they are correct.
 #define POPEN_DEC  1         /* popen() is declared */
 #define FTELL_DEC  1         /* ftell() is declared */
 #define FDOPEN_DEC  1        /* fdopen() is declared */
-#define SORTPROG  "gsort"         /* name of sort program */
+#define SORTPROG  "sort"         /* name of sort program */
 #define SORT_NEWKEY 1  /* if -k is supported */
 #define HAVE_PID_T 1    /* pid_t is defined */
 #define PUTENV_DEC 1   /* putenv() is declared */
