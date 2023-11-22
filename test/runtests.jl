@@ -13,6 +13,5 @@ using Test
     @test nv(g) == 10
     @test ne(g) == 15
     dict = nauty(g,automgroup=true)
-    @info dict
     @test dict[:grpsize] == 120
 end
