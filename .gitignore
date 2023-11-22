@@ -6,8 +6,8 @@
 *.a
 nauty.dylib
 build.log
-nauty2_8_6/config.log
-nauty*/config.status
-nauty*/tools.h
-nauty*/makefile
-nauty*/nauty.h
+deps/nauty*/config.log
+deps/nauty*/config.status
+deps/nauty*/gtools.h
+deps/nauty*/makefile
+deps/nauty*/nauty.h
