@@ -3,6 +3,7 @@ module Nauty
 using Graphs
 using Permutations
 using Libdl
+using DataStructures
 
 export nauty, traces, NautyIsomorphism
 
@@ -53,7 +54,7 @@ mutable struct optionblk
     schreier::Nbool	# use random schreier method
     extra_options::Ptr{Cvoid}	# void *extra_options;
 		# arbitrary extra options
-    automproc_data::Ptr{Cvoid}
+    userautomdata::Ptr{Cvoid}
 end
 
 const CONSOLWIDTH = 78
@@ -159,16 +160,15 @@ function __densenauty(g::DenseNautyXGraph, options::optionblk, partition)
     (stats, orbits, result...)
 end
 
-function userautomproc_jl_global(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint}, numorbits::Cint, stabvertex::Cint, n::Cint, data::Ptr{Vector{Permutation}}) #:Ref{Vector{Permutation}})
-    @info data
-#    xxx = unsafe_pointer_to_objref(extra_options)
-#    @info xxx
-    generators = Permutation[]
-#    @info generators
+list2set(ngroups,l) = IntDisjointSets{Int}(l,zeros(length(l)),ngroups)
+                                   
+function userautomproc_jl(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint}, numorbits::Cint, stabvertex::Cint, n::Cint, c_data::Ptr{Cvoid})
+    data = unsafe_pointer_to_objref(c_data)
+
     perm = unsafe_wrap(Array, permptr, n)
     orbits = unsafe_wrap(Array, orbitsptr, n)
 
-    push!(generators, Permutation(perm.+1))
+    push!(data, (Permutation(perm.+1),list2set(numorbits,orbits.+1),stabvertex+1))
     nothing
 end
 
@@ -177,12 +177,10 @@ end
 The arguments are a graph g and optional named arguments getcanon::Bool, automgroup::Bool and partition, which is either "nothing" or a list of lists of vertices (numbered from 1).
 
 The return value is a dictionary with entries
-:orbits (orbits numbered from 1), an Int[]
+:orbits (orbits numbered from 1), an IntDisjointSet
 :grpsize (possibly with rounding errors), a BigInt
-:numorbits (the number of orbits under the automorphism group), an Int
-:numgenerators (the number of group generators), an Int
 if automgroup,
-:generators (the generators of the automorphism group), a Permutation[]
+:generators (the generators of the automorphism group), a Tuple{Permutation,IntDisjointSets,Int}[] storing generators, the orbits under the generators up to this one, and the stabilized vertex up to now
 if getcanon,
 :lab (the correspondence between old vertices and new ones), a Permutation
 :canong (the canonically labelled graph), a DenseNautyGraph
@@ -217,25 +215,15 @@ function nauty(g::DenseNautyXGraph;
         labptn = (lab,ptn)
     end
 
-"""    local generators
-    function userautomproc_jl(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint}, numorbits::Cint, stabvertex::Cint, n::Cint, x::Ptr{Cvoid})
-        return nothing
-        perm = unsafe_wrap(Array, permptr, n)
-        orbits = unsafe_wrap(Array, orbitsptr, n)
-
-        push!(generators, Permutation(perm.+1))
-        nothing
-    end
-   """
+    result = Dict()
     
     if automgroup
-        options.userautomproc = @cfunction(userautomproc_jl_global, Nothing, (Cint, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Ptr{Vector{Permutation}})) #Ref{Vector{Permutation}}))
-        generators = Permutation[]
-        @info generators
-        @info pointer(generators)
-        @info pointer_from_objref(generators)
-        options.automproc_data = pointer_from_objref(generators)
+        options.userautomproc = @cfunction(userautomproc_jl, Nothing, (Cint, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Ptr{Cvoid}))
+        generators = Tuple{Permutation,IntDisjointSets{Int},Int}[]
+        options.userautomdata = pointer_from_objref(generators)
         rv = densenauty(g, options, labptn)        
+
+        result[:generators] = generators
     else
         rv = densenauty(g, options, labptn)
     end
@@ -244,14 +232,8 @@ function nauty(g::DenseNautyXGraph;
     stats = rv[1]
     stats.errstatus == 0 || error("densenauty: error $(stats.errstatus)")
     
-    result = Dict()
-    result[:orbits] = rv[2].+1
+    result[:orbits] = list2set(stats.numorbits,rv[2].+1)
     result[:grpsize] = div(BigInt(ldexp(significand(stats.grpsize1),precision(Float64)))*BigInt(10)^stats.grpsize2*BigInt(2)^exponent(stats.grpsize1)+BigInt(2)^(precision(Float64)-1),BigInt(2)^precision(Float64))
-    result[:numorbits] = Int(stats.numorbits)
-    result[:numgenerators] = Int(stats.numgenerators)
-    if automgroup
-        result[:generators] = generators
-    end
     if getcanon
         result[:lab] = rv[3].+1
         result[:canong] = rv[4]

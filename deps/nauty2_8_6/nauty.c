@@ -115,7 +115,8 @@ static TLS_ATTR
    boolean getcanon,digraph,writeautoms,domarkers,cartesian,doschreier;
 static TLS_ATTR int linelength,tc_level,mininvarlevel,maxinvarlevel,invararg;
 static TLS_ATTR void (*usernodeproc)(graph*,int*,int*,int,int,int,int,int,int);
-static TLS_ATTR void (*userautomproc)(int,int*,int*,int,int,int);
+static TLS_ATTR void (*userautomproc)(int,int*,int*,int,int,int,void*);
+static TLS_ATTR void *userautomdata;
 static TLS_ATTR void (*userlevelproc)
           (int*,int*,int,int*,statsblk*,int,int,int,int,int,int);
 static TLS_ATTR int (*usercanonproc)
@@ -393,6 +394,7 @@ nauty(graph *g_arg, int *lab, int *ptn, set *active_arg,
     outfile = (options->outfile == NULL ? stdout : options->outfile);
     usernodeproc = options->usernodeproc;
     userautomproc = options->userautomproc;
+    userautomdata = options->userautomdata;
     userlevelproc = options->userlevelproc;
     usercanonproc = options->usercanonproc;
 
@@ -987,7 +989,7 @@ processnode(int *lab, int *ptn, int level, int numcells)
         stats->numorbits = orbjoin(orbits,workperm,n);
         ++stats->numgenerators;
         OPTCALL(userautomproc)(stats->numgenerators,workperm,orbits,
-                                    stats->numorbits,stabvertex,n);
+			       stats->numorbits,stabvertex,n,userautomdata);
         if (doschreier) addgenerator(&gp,&gens,workperm,n);
         return gca_first;
 
@@ -1006,7 +1008,7 @@ processnode(int *lab, int *ptn, int level, int numcells)
             writeperm(outfile,workperm,cartesian,linelength,n);
         ++stats->numgenerators;
         OPTCALL(userautomproc)(stats->numgenerators,workperm,orbits,
-                                    stats->numorbits,stabvertex,n);
+                                    stats->numorbits,stabvertex,n,userautomdata);
         if (doschreier) addgenerator(&gp,&gens,workperm,n);
         if (orbits[cosetindex] < cosetindex)
             return gca_first;
@@ -1199,7 +1201,7 @@ extra_autom(int *p, int n)
     stats->numorbits = orbjoin(orbits,p,n);
     ++stats->numgenerators;
     OPTCALL(userautomproc)(stats->numgenerators,p,orbits,
-                                    stats->numorbits,stabvertex,n);
+                                    stats->numorbits,stabvertex,n,userautomdata);
 }
 
 /*****************************************************************************

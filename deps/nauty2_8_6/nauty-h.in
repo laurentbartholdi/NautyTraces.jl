@@ -1081,7 +1081,7 @@ typedef struct optionstruct
     void (*userrefproc)       /* replacement for usual refine procedure */
          (graph*,int*,int*,int,int*,int*,set*,int*,int,int);
     void (*userautomproc)     /* procedure called for each automorphism */
-         (int,int*,int*,int,int,int);
+         (int,int*,int*,int,int,int,void*);
     void (*userlevelproc)     /* procedure called for each level */
          (int*,int*,int,int*,statsblk*,int,int,int,int,int,int);
     void (*usernodeproc)      /* procedure called for each node */
@@ -1104,6 +1104,7 @@ typedef struct optionstruct
     int ptn_h;                /* Magma - no longer global sjc 1994 */
     int orbitset_h;           /* Magma - no longer global sjc 1994 */
 #endif
+    void *userautomdata;      /* extra argument passed to userautomproc */
 } optionblk;
 
 #ifndef CONSOLWIDTH
