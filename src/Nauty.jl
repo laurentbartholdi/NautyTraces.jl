@@ -172,18 +172,27 @@ function userautomproc_jl(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint},
     nothing
 end
 
+mutable struct NAUTY
+    orbits::IntDisjointSets{Int}
+    grpsize::BigInt
+    generators::Vector{@NamedTuple{permutation::Permutation,orbits::IntDisjointSets{Int},stabvertex::Int}}
+    lab::Permutation
+    canong::DenseNautyGraph
+    NAUTY() = new()
+end
+
 """nauty is a higher-level interface to nauty, which relies on densenauty.
 
 The arguments are a graph g and optional named arguments getcanon::Bool, automgroup::Bool and partition, which is either "nothing" or a list of lists of vertices (numbered from 1).
 
-The return value is a dictionary with entries
-:orbits (orbits numbered from 1), an IntDisjointSet
-:grpsize (possibly with rounding errors), a BigInt
+The return value is a mutable struct NAUTYP with entries
+* orbits (orbits numbered from 1), an IntDisjointSet
+* grpsize (possibly with rounding errors), a BigInt
 if automgroup,
-:generators (the generators of the automorphism group), a Tuple{Permutation,IntDisjointSets,Int}[] storing generators, the orbits under the generators up to this one, and the stabilized vertex up to now
+* generators (the generators of the automorphism group), a Tuple{Permutation,IntDisjointSets,Int}[] storing generators, the orbits under the generators up to this one, and the stabilized vertex up to now
 if getcanon,
-:lab (the correspondence between old vertices and new ones), a Permutation
-:canong (the canonically labelled graph), a DenseNautyGraph
+* lab (the correspondence between old vertices and new ones), a Permutation
+* canong (the canonically labelled graph), a DenseNautyGraph
 """
 function nauty(g::DenseNautyXGraph;
                getcanon::Bool = false,
@@ -215,7 +224,7 @@ function nauty(g::DenseNautyXGraph;
         labptn = (lab,ptn)
     end
 
-    result = Dict()
+    result = NAUTY()
     
     if automgroup
         options.userautomproc = @cfunction(userautomproc_jl, Nothing, (Cint, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Ptr{Cvoid}))
@@ -223,7 +232,7 @@ function nauty(g::DenseNautyXGraph;
         options.userautomdata = pointer_from_objref(generators)
         rv = densenauty(g, options, labptn)        
 
-        result[:generators] = generators
+        result.generators = generators
     else
         rv = densenauty(g, options, labptn)
     end
@@ -232,11 +241,11 @@ function nauty(g::DenseNautyXGraph;
     stats = rv[1]
     stats.errstatus == 0 || error("densenauty: error $(stats.errstatus)")
     
-    result[:orbits] = list2set(stats.numorbits,rv[2].+1)
-    result[:grpsize] = div(BigInt(ldexp(significand(stats.grpsize1),precision(Float64)))*BigInt(10)^stats.grpsize2*BigInt(2)^exponent(stats.grpsize1)+BigInt(2)^(precision(Float64)-1),BigInt(2)^precision(Float64))
+    result.orbits = list2set(stats.numorbits,rv[2].+1)
+    result.grpsize = div(BigInt(ldexp(significand(stats.grpsize1),precision(Float64)))*BigInt(10)^stats.grpsize2*BigInt(2)^exponent(stats.grpsize1)+BigInt(2)^(precision(Float64)-1),BigInt(2)^precision(Float64))
     if getcanon
-        result[:lab] = rv[3].+1
-        result[:canong] = rv[4]
+        result.lab = rv[3].+1
+        result.canong = rv[4]
     end
     result
 end
@@ -254,8 +263,8 @@ function Graphs.Experimental.has_isomorph(g1::AbstractGraph, g2::AbstractGraph, 
     vertex_relation == nothing || error("didn't code vertex relations yet")
     edge_relation == nothing || error("didn't code edge relations yet")
     
-    return nauty(DenseNautyGraph(g1),getcanon=true)[:canong] ==
-        nauty(DenseNautyGraph(g2),getcanon=true)[:canong];
+    return nauty(DenseNautyGraph(g1),getcanon=true).canong ==
+        nauty(DenseNautyGraph(g2),getcanon=true).canong
 end
 
 #!!! sparse version

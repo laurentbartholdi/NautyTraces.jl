@@ -12,6 +12,6 @@ using Test
     end
     @test nv(g) == 10
     @test ne(g) == 15
-    dict = nauty(g,automgroup=true)
-    @test dict[:grpsize] == 120
+    result = nauty(g,automgroup=true)
+    @test result.grpsize == 120
 end
