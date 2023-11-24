@@ -5,7 +5,7 @@ using Permutations
 using Libdl
 using DataStructures
 
-export nauty, traces, NautyIsomorphism
+export nauty, traces, add_edge!, NautyIsomorphism
 
 const LIB_FILE = "$(@__DIR__)" * "/../deps/nauty." * Libdl.dlext
 
@@ -115,17 +115,17 @@ Its arguments match closely the call to densenauty: a graph, an option block, an
 The return value is (stats, orbits, ...) a stats block, a description of the minimal vertices (numbered from 0) in each orbit, and (if options.getcanon) a list (also numbered from 0) matching the graph's vertices with those in the canonical graph, and the canonical graph itself.
 """
 function densenauty(g::DenseNautyGraph,
-               options = DEFAULTOPTIONS_GRAPH()::optionblk,
-                    partition = nothing::Union{Nothing,Tuple{Vector{Cint},Vector{Cint}}})
+               options::optionblk = DEFAULTOPTIONS_GRAPH(),
+                    partition::Union{Nothing,Tuple{Vector{Cint},Vector{Cint}}} = nothing)
     __densenauty(g, options, partition)
 end
 function densenauty(g::DenseNautyDiGraph,
-                    options = DEFAULTOPTIONS_DIGRAPH()::optionblk,
-                    partition = nothing::Union{Nothing,Tuple{Vector{Cint},Vector{Cint}}})
+                    options::optionblk = DEFAULTOPTIONS_DIGRAPH(),
+                    partition::Union{Nothing,Tuple{Vector{Cint},Vector{Cint}}} = nothing)
     __densenauty(g, options, partition)
 end
 
-function __densenauty(g::DenseNautyXGraph, options::optionblk, partition)
+function __densenauty(g::DenseNautyXGraph, options, partition)
     n = nv(g)
     stats = statsblk()
 
@@ -168,7 +168,7 @@ function userautomproc_jl(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint},
     perm = unsafe_wrap(Array, permptr, n)
     orbits = unsafe_wrap(Array, orbitsptr, n)
 
-    push!(data, (Permutation(perm.+1),list2set(numorbits,orbits.+1),stabvertex+1))
+    push!(data, (permutation = Permutation(perm.+1),orbits = list2set(numorbits,orbits.+1),stabvertex = stabvertex+1))
     nothing
 end
 
@@ -186,9 +186,9 @@ if getcanon,
 :canong (the canonically labelled graph), a DenseNautyGraph
 """
 function nauty(g::DenseNautyXGraph;
-               getcanon = false::Bool,
-               automgroup = false::Bool,
-               partition = nothing::Union{Nothing,Tuple{Vector{Cint},Vector{Cint}},Vector{Vector{Int}}})
+               getcanon::Bool = false,
+               automgroup::Bool = false,
+               partition::Union{Nothing,Tuple{Vector{Cint},Vector{Cint}},Vector{Vector{Int}}} = nothing)
     options = DEFAULTOPTIONS(g)
 
     if getcanon
@@ -219,7 +219,7 @@ function nauty(g::DenseNautyXGraph;
     
     if automgroup
         options.userautomproc = @cfunction(userautomproc_jl, Nothing, (Cint, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Ptr{Cvoid}))
-        generators = Tuple{Permutation,IntDisjointSets{Int},Int}[]
+        generators = @NamedTuple{permutation::Permutation,orbits::IntDisjointSets{Int},stabvertex::Int}[]
         options.userautomdata = pointer_from_objref(generators)
         rv = densenauty(g, options, labptn)        
 
