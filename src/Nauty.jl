@@ -244,7 +244,7 @@ function nauty(g::DenseNautyXGraph;
     result.orbits = list2set(stats.numorbits,rv[2].+1)
     result.grpsize = div(BigInt(ldexp(significand(stats.grpsize1),precision(Float64)))*BigInt(10)^stats.grpsize2*BigInt(2)^exponent(stats.grpsize1)+BigInt(2)^(precision(Float64)-1),BigInt(2)^precision(Float64))
     if getcanon
-        result.lab = rv[3].+1
+        result.lab = Permutation(rv[3].+1)
         result.canong = rv[4]
     end
     result
