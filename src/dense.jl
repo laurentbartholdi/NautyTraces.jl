@@ -23,10 +23,10 @@ Graphs.is_directed(::DenseNautyDiGraph) = true
 
 DenseNautyXGraph = Union{DenseNautyGraph,DenseNautyDiGraph}
 
-num_setwords(n::Int) = (n+WORDSIZE-1)÷WORDSIZE
-setpos(n::Int) = 1+((n-1)⊻0x3f)
+num_setwords(n) = (n+WORDSIZE-1)÷WORDSIZE
+setpos(n) = 1+((n-1)⊻0x3f)
 
-DenseNautyGraph(n::Int) = (data = BitMatrix(undef,WORDSIZE*num_setwords(n),n); fill!(data,false); DenseNautyGraph(data))
+DenseNautyGraph(n::T) where T <: Integer = (data = BitMatrix(undef,WORDSIZE*num_setwords(n),n); fill!(data,false); DenseNautyGraph(data))
 
 function DenseNautyGraph(mat::Union{Matrix,BitMatrix})
     n = size(mat,1)
@@ -40,7 +40,7 @@ function DenseNautyGraph(mat::Union{Matrix,BitMatrix})
     DenseNautyGraph(data)
 end
 
-DenseNautyDiGraph(n::Int) = (data = BitMatrix(undef,WORDSIZE*num_setwords(n),n); fill!(data,false); DenseNautyDiGraph(data))
+DenseNautyDiGraph(n::T) where T <: Integer = (data = BitMatrix(undef,WORDSIZE*num_setwords(n),n); fill!(data,false); DenseNautyDiGraph(data))
 
 function DenseNautyDiGraph(mat::Union{Matrix{Int},Matrix{Bool},BitMatrix})
     n = size(mat,1)
@@ -131,9 +131,9 @@ function Base.iterate(eit::DenseNautyEdgeIter, state=(1,0))
     end
 end
 
-Graphs.has_edge(g::DenseNautyXGraph, s::Int, d::Int) = g.data[setpos(d),s]
+Graphs.has_edge(g::DenseNautyXGraph, s, d) = g.data[setpos(d),s]
 
-function Graphs.inneighbors(g::DenseNautyXGraph, v::Int)
+function Graphs.inneighbors(g::DenseNautyXGraph, v)
     n = Int[]
     for i=1:nv(g)
         g.data[setpos(v),i] && push!(n,i)
@@ -141,7 +141,7 @@ function Graphs.inneighbors(g::DenseNautyXGraph, v::Int)
     n
 end
 
-function Graphs.outneighbors(g::DenseNautyXGraph, v::Int)
+function Graphs.outneighbors(g::DenseNautyXGraph, v)
     n = Int[]
     for i=1:nv(g)
         g.data[setpos(i),v] && push!(n,i)
@@ -149,10 +149,10 @@ function Graphs.outneighbors(g::DenseNautyXGraph, v::Int)
     n
 end
 
-Graphs.add_edge!(g::DenseNautyGraph, s::Int, d::Int) = (g.data[setpos(d),s] = g.data[setpos(s),d] = true)
-Graphs.add_edge!(g::DenseNautyDiGraph, s::Int, d::Int) = (g.data[setpos(d),s] = true)
+Graphs.add_edge!(g::DenseNautyGraph, s, d) = (g.data[setpos(d),s] = g.data[setpos(s),d] = true)
+Graphs.add_edge!(g::DenseNautyDiGraph, s, d) = (g.data[setpos(d),s] = true)
 Graphs.add_edge!(g::DenseNautyXGraph, e::Edge) = add_edge!(g, e.src, e.dst)
 
-Graphs.rem_edge!(g::DenseNautyGraph, s::Int, d::Int) = (g.data[setpos(d),s] = g.data[setpos(s),d] = false; true)
-Graphs.rem_edge!(g::DenseNautyDiGraph, s::Int, d::Int) = (g.data[setpos(d),s] = false; true)
+Graphs.rem_edge!(g::DenseNautyGraph, s, d) = (g.data[setpos(d),s] = g.data[setpos(s),d] = false; true)
+Graphs.rem_edge!(g::DenseNautyDiGraph, s, d) = (g.data[setpos(d),s] = false; true)
 Graphs.rem_edge!(g::DenseNautyXGraph, e::Edge) = rem_edge!(g, e.src, e.dst)
