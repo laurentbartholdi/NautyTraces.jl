@@ -108,11 +108,21 @@ function Base.show(io::IO, ::MIME"text/plain", stats::statsblk)
     pprintobject("statsblk", stats)
 end
 
-"""densenauty is the low-level interface to nauty.
+"""
+    densenauty(g::DenseNautyGraph, options = DEFAULTOPTIONS_GRAPH(), partition = nothing) -> Tuple\\
+    densenauty(g::DenseNautyDiGraph, options = DEFAULTOPTIONS_DIGRAPH(), partition = nothing) -> Tuple
 
-Its arguments match closely the call to densenauty: a graph, an option block, an optionally a partition, in the form of a pair of lists (lab,ptn).
+This is the low-level interface to nauty, with a minimal amount of changes to
+data. Its arguments match closely the call to densenauty: a graph, an option
+block, an optionally a partition, in the form of a pair of lists (lab,ptn):
+- `g` is a dense graph or digraph in Nauty format
+- `options` is a `struct` following the Nauty structure layout
+- `partition` is either `nothing` or `Tuple{Vector{Cint},Vector{Cint}}` representing a partition of the vertices of the graph, in the format `(lab,ptn)`.
 
-The return value is (stats, orbits, ...) a stats block, a description of the minimal vertices (numbered from 0) in each orbit, and (if options.getcanon) a list (also numbered from 0) matching the graph's vertices with those in the canonical graph, and the canonical graph itself.
+The return value is (stats, orbits, ...) a stats block, a description of the
+minimal vertices (numbered from 0) in each orbit, and (if options.getcanon) a
+list (also numbered from 0) matching the graph's vertices with those in the
+canonical graph, and the canonical graph itself.
 """
 function densenauty(g::DenseNautyGraph,
                options::optionblk = DEFAULTOPTIONS_GRAPH(),
@@ -164,11 +174,12 @@ list2set(ngroups,l) = IntDisjointSets{Int}(l,zeros(length(l)),ngroups)
                                    
 function userautomproc_jl(count::Cint, permptr::Ptr{Cint}, orbitsptr::Ptr{Cint}, numorbits::Cint, stabvertex::Cint, n::Cint, c_data::Ptr{Cvoid})
     data = unsafe_pointer_to_objref(c_data)
-
+    
     perm = unsafe_wrap(Array, permptr, n)
     orbits = unsafe_wrap(Array, orbitsptr, n)
 
-    push!(data, (permutation = Permutation(perm.+1),orbits = list2set(numorbits,orbits.+1),stabvertex = stabvertex+1))
+    rec = (permutation = Permutation(perm.+1),orbits = list2set(numorbits,orbits.+1),stabvertex = stabvertex+1)
+    push!(data, rec)
     nothing
 end
 
@@ -181,18 +192,28 @@ mutable struct NAUTY
     NAUTY() = new()
 end
 
-"""nauty is a higher-level interface to nauty, which relies on densenauty.
+function Base.show(io::IO, ::MIME"text/plain", nauty::NAUTY)
+    print(io, "(orbits: $(nauty.orbits), group size: $(nauty.grpsize)")
+    isdefined(nauty,:lab) && print(io,", labeling: $(nauty.lab)")
+    isdefined(nauty,:canong) && print(io,", canong")
+    isdefined(nauty,:generators) && print(io,", generators: $([x.permutation for x=nauty.generators])")
+    print(io, ")")
+end
 
-The arguments are a graph g and optional named arguments getcanon::Bool, automgroup::Bool and partition, which is either "nothing" or a list of lists of vertices (numbered from 1).
+"""
+    nauty(g::DenseNauty[Di]Graph; getcanon = false, automgroup = false, partition = nothing) -> NAUTY
 
-The return value is a mutable struct NAUTYP with entries
-* orbits (orbits numbered from 1), an IntDisjointSet
-* grpsize (possibly with rounding errors), a BigInt
-if automgroup,
-* generators (the generators of the automorphism group), a Tuple{Permutation,IntDisjointSets,Int}[] storing generators, the orbits under the generators up to this one, and the stabilized vertex up to now
-if getcanon,
-* lab (the correspondence between old vertices and new ones), a Permutation
-* canong (the canonically labelled graph), a DenseNautyGraph
+nauty is a higher-level interface to nauty, which relies on densenauty. The
+arguments are a graph `g` and optional named arguments getcanon::Bool,
+automgroup::Bool and partition, which is either `nothing` or a tuple
+`(lab,ptn)` as in the raw Nauty format, or a list of lists of vertices
+(numbered from 1).
+
+The return value is a mutable struct NAUTY with entries
+- `orbits::IntDisjointSet`, the orbits of the automorphism group numbered from 1
+- `grpsize::BigInt`, the group size (possibly with rounding errors)
+- if automgroup, `generators::Vector{Tuple{Permutation,IntDisjointSets,Int}}, the generators of the automorphism group, representing each generator with the orbits under the generators up to this one and the stabilized vertex up to now
+- if getcanon, `lab::Permutation`, the correspondence between old vertices and new ones, and `canong::typeof(g)`, the canonically labelled graph
 """
 function nauty(g::DenseNautyXGraph;
                getcanon::Bool = false,
@@ -230,13 +251,13 @@ function nauty(g::DenseNautyXGraph;
         options.userautomproc = @cfunction(userautomproc_jl, Nothing, (Cint, Ptr{Cint}, Ptr{Cint}, Cint, Cint, Cint, Ptr{Cvoid}))
         generators = @NamedTuple{permutation::Permutation,orbits::IntDisjointSets{Int},stabvertex::Int}[]
         options.userautomdata = pointer_from_objref(generators)
+
         rv = densenauty(g, options, labptn)        
 
         result.generators = generators
     else
         rv = densenauty(g, options, labptn)
     end
-
 
     stats = rv[1]
     stats.errstatus == 0 || error("densenauty: error $(stats.errstatus)")
@@ -267,6 +288,6 @@ function Graphs.Experimental.has_isomorph(g1::AbstractGraph, g2::AbstractGraph, 
         nauty(DenseNautyGraph(g2),getcanon=true).canong
 end
 
-#!!! sparse version
+#add sparse version in the future
 
 end

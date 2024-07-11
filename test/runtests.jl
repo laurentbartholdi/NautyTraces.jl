@@ -1,8 +1,8 @@
 using Graphs
-using Nauty
+using NautyTraces
 using Test
 
-@testset "Nauty.jl" begin
+@testset "NautyTraces.jl" begin
     # Petersen graph
     g = DenseNautyGraph(10)
     for i=1:5

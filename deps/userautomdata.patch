@@ -1,0 +1,72 @@
+Only in nauty2_8_8.orig: gtools.h
+Only in nauty2_8_8.orig: makefile
+diff --recursive -u nauty2_8_8.orig/nauty-h.in nauty2_8_8/nauty-h.in
+--- nauty2_8_8.orig/nauty-h.in	2023-11-21 06:57:10
++++ nauty2_8_8/nauty-h.in	2024-07-11 21:33:29
+@@ -1152,7 +1152,7 @@
+     void (*userrefproc)       /* replacement for usual refine procedure */
+          (graph*,int*,int*,int,int*,int*,set*,int*,int,int);
+     void (*userautomproc)     /* procedure called for each automorphism */
+-         (int,int*,int*,int,int,int);
++         (int,int*,int*,int,int,int,void*);
+     void (*userlevelproc)     /* procedure called for each level */
+          (int*,int*,int,int*,statsblk*,int,int,int,int,int,int);
+     void (*usernodeproc)      /* procedure called for each node */
+@@ -1175,6 +1175,7 @@
+     int ptn_h;                /* Magma - no longer global sjc 1994 */
+     int orbitset_h;           /* Magma - no longer global sjc 1994 */
+ #endif
++    void *userautomdata;      /* extra argument passed to userautomproc */
+ } optionblk;
+ 
+ #ifndef CONSOLWIDTH
+Only in nauty2_8_8: nauty-h.in.orig
+diff --recursive -u nauty2_8_8.orig/nauty.c nauty2_8_8/nauty.c
+--- nauty2_8_8.orig/nauty.c	2023-11-21 06:57:10
++++ nauty2_8_8/nauty.c	2024-07-11 21:33:32
+@@ -115,7 +115,8 @@
+    boolean getcanon,digraph,writeautoms,domarkers,cartesian,doschreier;
+ static TLS_ATTR int linelength,tc_level,mininvarlevel,maxinvarlevel,invararg;
+ static TLS_ATTR void (*usernodeproc)(graph*,int*,int*,int,int,int,int,int,int);
+-static TLS_ATTR void (*userautomproc)(int,int*,int*,int,int,int);
++static TLS_ATTR void (*userautomproc)(int,int*,int*,int,int,int,void*);
++static TLS_ATTR void *userautomdata;
+ static TLS_ATTR void (*userlevelproc)
+           (int*,int*,int,int*,statsblk*,int,int,int,int,int,int);
+ static TLS_ATTR int (*usercanonproc)
+@@ -393,6 +394,7 @@
+     outfile = (options->outfile == NULL ? stdout : options->outfile);
+     usernodeproc = options->usernodeproc;
+     userautomproc = options->userautomproc;
++    userautomdata = options->userautomdata;
+     userlevelproc = options->userlevelproc;
+     usercanonproc = options->usercanonproc;
+ 
+@@ -987,7 +989,7 @@
+         stats->numorbits = orbjoin(orbits,workperm,n);
+         ++stats->numgenerators;
+         OPTCALL(userautomproc)(stats->numgenerators,workperm,orbits,
+-                                    stats->numorbits,stabvertex,n);
++			       stats->numorbits,stabvertex,n,userautomdata);
+         if (doschreier) addgenerator(&gp,&gens,workperm,n);
+         return gca_first;
+ 
+@@ -1006,7 +1008,7 @@
+             writeperm(outfile,workperm,cartesian,linelength,n);
+         ++stats->numgenerators;
+         OPTCALL(userautomproc)(stats->numgenerators,workperm,orbits,
+-                                    stats->numorbits,stabvertex,n);
++                                    stats->numorbits,stabvertex,n,userautomdata);
+         if (doschreier) addgenerator(&gp,&gens,workperm,n);
+         if (orbits[cosetindex] < cosetindex)
+             return gca_first;
+@@ -1199,7 +1201,7 @@
+     stats->numorbits = orbjoin(orbits,p,n);
+     ++stats->numgenerators;
+     OPTCALL(userautomproc)(stats->numgenerators,p,orbits,
+-                                    stats->numorbits,stabvertex,n);
++                                    stats->numorbits,stabvertex,n,userautomdata);
+ }
+ 
+ /*****************************************************************************
+Only in nauty2_8_8.orig: nauty.h

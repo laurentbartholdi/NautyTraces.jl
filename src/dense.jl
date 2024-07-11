@@ -5,9 +5,15 @@ WORDSIZE == 64 || error("WORDSIZE is not 64. Probably all hell will break loose.
 export DenseNautyGraph, DenseNautyDiGraph
 
 """
-A dense Nauty graph is a bit matrix: if the graph has n vertices,
-then it is coded as an (WORDSIZE*m)×n bit matrix, with m=(n+WORDSIZE-1)÷WORDSIZE.
-Each column of that matrix is thus a chunk of memory of size m, and the ith column represents the adjacency list of the the ith vertex. The bits are reversed in each word, so to know if the ith vertex is connected to vertex j, check data[setpos(j),i].
+  DenseNautyGraph(size::Int)\\
+  DenseNautyGraph(adj::Matrix)\\
+  DenseNautyGraph(g::AbstractGraph)
+
+Constructs a new dense Nauty graph.
+
+A dense Nauty graph is a bit matrix: if the graph has `n` vertices,
+then it is coded as an `(WORDSIZE*m)×n` bit matrix, with `m=(n+WORDSIZE-1)÷WORDSIZE`.
+Each column of that matrix is thus a chunk of memory of size `m`, and the `i`th column represents the adjacency list of the the `i`th vertex. The bits are reversed in each word, so to know if the `i`th vertex is connected to vertex `j`, check the field `data[setpos(j),i]`.
 """
 struct DenseNautyGraph <: AbstractGraph{Int}
     data::BitMatrix
@@ -15,6 +21,17 @@ end
 Graphs.is_directed(::Type{DenseNautyGraph}) = false
 Graphs.is_directed(::DenseNautyGraph) = false
 
+"""
+  DenseNautyDiGraph(size::Int)\\
+  DenseNautyDiGraph(adj::Matrix)\\
+  DenseNautyDiGraph(g::AbstractGraph)
+
+Constructs a new dense Nauty directed graph.
+
+A dense Nauty directed graph is a bit matrix: if the graph has `n` vertices,
+then it is coded as an `(WORDSIZE*m)×n` bit matrix, with `m=(n+WORDSIZE-1)÷WORDSIZE`.
+Each column of that matrix is thus a chunk of memory of size `m`, and the `i`th column represents the adjacency list of the the `i`th vertex. The bits are reversed in each word, so to know if the `i`th vertex is connected to vertex `j`, check the field `data[setpos(j),i]`.
+"""
 struct DenseNautyDiGraph <: AbstractGraph{Int}
     data::BitMatrix
 end
@@ -78,7 +95,7 @@ Base.hash(g::DenseNautyXGraph) = hash(g.data)
 Base.copy(g::DenseNautyXGraph) = typeof(g)(copy(g.data))
     
 Base.eltype(g::DenseNautyXGraph) = Int
-Graphs.edgetype(g::DenseNautyXGraph) = SimpleEdge{eltype(g)}
+Graphs.edgetype(g::DenseNautyXGraph) = Graphs.SimpleGraphs.SimpleEdge{eltype(g)}
 
 Graphs.nv(g::DenseNautyXGraph) = size(g.data,2)
 
@@ -107,12 +124,38 @@ function Base.reverse(g::DenseNautyDiGraph)
     DenseNautyDiGraph(data)
 end
 
-Graphs.edges(g::DenseNautyXGraph) = DenseNautyEdgeIter(g)
+Graphs.edges(g::DenseNautyGraph) = DenseNautyEdgeIter(g)
 struct DenseNautyEdgeIter <: AbstractEdgeIter
-    g::DenseNautyXGraph
+    g::DenseNautyGraph
 end
+Base.eltype(eit::DenseNautyEdgeIter) = Graphs.SimpleGraphs.SimpleEdge{eltype(eit.g)}
 Base.length(eit::DenseNautyEdgeIter) = ne(eit.g)
-function Base.iterate(eit::DenseNautyEdgeIter, state=(1,0))
+function Base.iterate(eit::DenseNautyEdgeIter, state=(0,1))
+    g = eit.g
+    n = nv(g)
+    d, s = state
+    while true
+        d += 1
+        if d >= s
+            s += 1
+            d = 1
+        end
+        if s > n
+            return nothing
+        end
+        if g.data[setpos(d),s]
+            return Edge(d,s), (d,s)
+        end
+    end
+end
+
+Graphs.edges(g::DenseNautyDiGraph) = DenseNautyDiEdgeIter(g)
+struct DenseNautyDiEdgeIter <: AbstractEdgeIter
+    g::DenseNautyDiGraph
+end
+Base.eltype(eit::DenseNautyDiEdgeIter) = Graphs.SimpleGraphs.SimpleEdge{eltype(eit.g)}
+Base.length(eit::DenseNautyDiEdgeIter) = ne(eit.g)
+function Base.iterate(eit::DenseNautyDiEdgeIter, state=(1,0))
     g = eit.g
     n = nv(g)
     s, d = state
