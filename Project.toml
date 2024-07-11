@@ -1,4 +1,4 @@
-name = "Nauty"
+name = "NautyTraces"
 uuid = "d13d708c-e6ca-4145-9b59-cdd1b3737971"
 authors = ["Laurent Bartholdi <laurent.bartholdi@gmail.com>"]
 version = "0.2.0"
