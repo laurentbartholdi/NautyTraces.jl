@@ -1,4 +1,4 @@
-module Nauty
+module NautyTraces
 
 using Graphs
 using Permutations
