@@ -82,7 +82,7 @@ function pprintobject(name, obj, sep=", ")
   print(")")
 end
 
-function Base.show(io::IO, ::MIME"text/plain", options::Nauty.optionblk)
+function Base.show(io::IO, ::MIME"text/plain", options::optionblk)
     pprintobject("optionblk", options)
 end
 
@@ -104,7 +104,7 @@ end
 
 const statsblk() = statsblk(zeros(13)...)
 
-function Base.show(io::IO, ::MIME"text/plain", stats::Nauty.statsblk)
+function Base.show(io::IO, ::MIME"text/plain", stats::statsblk)
     pprintobject("statsblk", stats)
 end
 
