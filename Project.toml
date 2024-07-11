@@ -13,9 +13,9 @@ Permutations = "2ae35dd2-176d-5d53-8349-f30d82d94d4f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
-julia = "1.8"
+julia = "1.10"
 DataStructures = "0.18"
-Graphs = "1.9"
+Graphs = "1.11"
 Permutations = "0.4"
 
 [targets]
